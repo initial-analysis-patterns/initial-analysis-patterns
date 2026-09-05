@@ -6,7 +6,9 @@ Run after every change to the workbook:
     python tools/build_patterns.py
 
 Reads   : Patterns_findings.xlsx      (the master; the team keeps editing it in Excel)
+          *.ipynb                     (the notebooks, rendered for in-page reading)
 Writes  : docs/data/patterns.js       (window.PATTERNS = {...}, loadable via file://)
+          docs/data/notebooks.js      (window.NOTEBOOKS = {...}, the rendered notebooks)
           docs/data/build-report.txt  (data issues found, nothing is silently fixed)
 
 Notebook links are resolved by name, not from the workbook: a pattern called
@@ -32,6 +34,7 @@ REPO = Path(__file__).resolve().parent.parent
 WORKBOOK = REPO / "Patterns_findings.xlsx"
 SHEET = "Pattern Definitions & Examples "
 OUT_JS = REPO / "docs" / "data" / "patterns.js"
+OUT_NOTEBOOKS = REPO / "docs" / "data" / "notebooks.js"
 OUT_REPORT = REPO / "docs" / "data" / "build-report.txt"
 
 HEADER_ROW = 9
@@ -341,6 +344,26 @@ def load_comments(path: Path) -> dict[int, list[dict]]:
     return out
 
 
+def workbook_saved(path: Path) -> str:
+    """When the workbook was last saved, not when the build ran.
+
+    Deriving the stamp from the input keeps the build reproducible: rerunning it
+    on unchanged input produces byte-identical output, so the GitHub Action does
+    not commit a new timestamp on every run. It also answers the question the
+    reader actually has - how current is this catalogue.
+    """
+    try:
+        with zipfile.ZipFile(path) as zf:
+            core = ET.fromstring(zf.read("docProps/core.xml"))
+        for tag in ("modified", "created"):
+            found = core.find(f"{{http://purl.org/dc/terms/}}{tag}")
+            if found is not None and found.text:
+                return found.text[:10]
+    except (KeyError, ET.ParseError, zipfile.BadZipFile):
+        pass
+    return dt.date.fromtimestamp(path.stat().st_mtime).isoformat()
+
+
 def build(workbook_path: Path) -> dict:
     wb = openpyxl.load_workbook(workbook_path, rich_text=True)
     if SHEET not in wb.sheetnames:
@@ -437,7 +460,7 @@ def build(workbook_path: Path) -> dict:
             note("category", f"category {cat!r} has a single member: {members[0]}")
 
     return {
-        "generated": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generated": workbook_saved(workbook_path),
         "source": workbook_path.name,
         "status_labels": STATUS_LABELS,
         "categories": categories,
@@ -445,6 +468,115 @@ def build(workbook_path: Path) -> dict:
         "datasets": sorted({d for p in patterns for d in p["datasets"]}),
         "patterns": patterns,
     }
+
+
+# Output types that only exist to drive JavaScript in a live Jupyter session
+# (tqdm progress bars, the VS Code data viewer). Dropping them before conversion
+# makes nbconvert fall back to the plain-text output instead of emitting an
+# empty box plus a few hundred kilobytes of widget state.
+DEAD_MIMETYPES = (
+    "application/vnd.jupyter.widget-view+json",
+    "application/vnd.jupyter.widget-state+json",
+    "application/vnd.microsoft.datawrangler.viewer.v0+json",
+)
+
+
+# nbconvert leaves TeX for a browser-side MathJax that this site deliberately
+# does not load (it would need a CDN, and the site has to work offline). Instead
+# the formulas are turned into readable plain text at build time. This is not a
+# TeX engine and is not meant to be one: it covers the notation the notebooks
+# actually use, and anything it does not know simply keeps its backslash.
+MATH_BLOCK = re.compile(r"\$\$(.+?)\$\$", re.S)
+# Inline math, kept on one line and never crossing a tag boundary.
+MATH_INLINE = re.compile(r"(?<![\w$])\$(?!\s)([^$\n<>]{1,200}?)(?<!\s)\$(?![\w$])")
+
+TEX_WORDS = {
+    r"\\cdot": "·", r"\\times": "×", r"\\leq": "≤", r"\\geq": "≥",
+    r"\\neq": "≠", r"\\approx": "≈", r"\\in\b": "∈", r"\\cup": "∪",
+    r"\\cap": "∩", r"\\sum": "sum", r"\\prod": "prod", r"\\min": "min",
+    r"\\max": "max", r"\\log": "log", r"\\left": "", r"\\right": "",
+    r"\\,": "", r"\\;": " ", r"\\!": "", r"\\quad": "  ", r"\\qquad": "   ",
+}
+
+
+def _wrap(part: str) -> str:
+    """Parenthesise a fraction operand only when it is more than a single term."""
+    part = part.strip()
+    return part if re.fullmatch(r"[\w.^_]+", part) else f"({part})"
+
+
+def tex_to_text(tex: str) -> str:
+    """Best-effort plain-text rendering of the TeX used in these notebooks."""
+    out = tex.strip()
+    out = re.sub(r"\\(?:mathrm|mathit|text|mathbf)\{([^{}]*)\}", r"\1", out)
+    out = re.sub(r"\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}",
+                 lambda m: f"{_wrap(m.group(1))} / {_wrap(m.group(2))}", out)
+    for pattern, replacement in TEX_WORDS.items():
+        out = re.sub(pattern, replacement, out)
+    out = re.sub(r"\s+", " ", out)
+    return out.strip()
+
+
+def mark_math(html: str) -> str:
+    # Inline "$...$" is only interpreted in notebooks that also use display
+    # math, so a stray pair of dollar amounts elsewhere is left alone.
+    uses_tex = "$$" in html
+    html = MATH_BLOCK.sub(
+        lambda m: f'<code class="tex">{tex_to_text(m.group(1))}</code>', html)
+    if uses_tex:
+        html = MATH_INLINE.sub(
+            lambda m: f'<code class="tex inline">{tex_to_text(m.group(1))}</code>', html)
+    return html
+
+
+def render_notebooks(patterns: list[dict]) -> dict[str, str]:
+    """Render each linked notebook to an HTML fragment for in-page reading.
+
+    Optional: without nbconvert the site simply keeps linking to the notebooks
+    instead of showing them, so the build never fails over a missing dependency.
+    """
+    wanted = [p for p in patterns if p["notebook"]]
+    if not wanted:
+        return {}
+
+    try:
+        import nbformat
+        from nbconvert import HTMLExporter
+    except ImportError:
+        note("notebook", "nbconvert is not installed - notebooks are linked but not shown "
+                         "(pip install -r tools/requirements.txt)")
+        return {}
+
+    exporter = HTMLExporter(template_name="basic", embed_images=True)
+    rendered = {}
+    for p in wanted:
+        path = REPO / p["notebook"]
+        try:
+            nb = nbformat.read(path, as_version=4)
+        except Exception as exc:  # a malformed notebook must not break the build
+            note("notebook", f"{p['notebook']}: could not be read ({exc})")
+            continue
+
+        for cell in nb.cells:
+            for output in cell.get("outputs", []):
+                data = output.get("data")
+                if data:
+                    for mime in DEAD_MIMETYPES:
+                        data.pop(mime, None)
+
+        try:
+            body, _ = exporter.from_notebook_node(nb)
+        except Exception as exc:
+            note("notebook", f"{p['notebook']}: could not be rendered ({exc})")
+            continue
+
+        # The fragment is injected with innerHTML, which never runs scripts;
+        # removing them keeps the markup honest rather than merely inert.
+        body = re.sub(r"<script\b.*?</script>", "", body, flags=re.S | re.I)
+        body = mark_math(body)
+        rendered[p["slug"]] = body.strip()
+
+    return rendered
 
 
 def main() -> None:
@@ -467,19 +599,28 @@ def main() -> None:
         encoding="utf-8",
     )
 
+    notebooks = render_notebooks(data["patterns"])
+    OUT_NOTEBOOKS.write_text(
+        "// Generated by tools/build_patterns.py - do not edit by hand.\n"
+        "// Rendered from the .ipynb files in the repository root.\n"
+        f"window.NOTEBOOKS = {json.dumps(notebooks, ensure_ascii=False)};\n",
+        encoding="utf-8",
+    )
+
     header = [
-        f"Build report - {data['generated']}",
-        f"Source: {data['source']}",
+        f"Build report for {data['source']}, saved {data['generated']}",
         f"{len(data['patterns'])} patterns, "
         f"{sum(1 for p in data['patterns'] if p['notebook'])} with a notebook, "
-        f"{sum(p['open_comments'] for p in data['patterns'])} open review comments",
+        f"{sum(p['open_comments'] for p in data['patterns'])} open review comments, "
+        f"{len(notebooks)} notebooks rendered",
         "",
     ]
     body = report_lines or ["No issues found."]
     OUT_REPORT.write_text("\n".join(header + sorted(body)) + "\n", encoding="utf-8")
 
     print("\n".join(header + sorted(body)))
-    print(f"\nwrote {OUT_JS.relative_to(REPO)} and {OUT_REPORT.relative_to(REPO)}")
+    print(f"\nwrote {OUT_JS.relative_to(REPO)}, {OUT_NOTEBOOKS.relative_to(REPO)} "
+          f"and {OUT_REPORT.relative_to(REPO)}")
 
 
 if __name__ == "__main__":
