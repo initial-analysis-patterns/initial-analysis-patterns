@@ -1,0 +1,17 @@
+Build report - 2026-09-05 12:07
+Source: Patterns_findings.xlsx
+33 patterns, 3 with a notebook, 46 open review comments
+
+dataset   Activity Schema Overlap: dataset 'BPIC 2012 (Loan application)' normalised to 'BPIC 2012'
+dataset   Activity–Attribute Association: 'BPIC 2019' appears inside the RTFM block instead of as its own heading
+dataset   Activity–Attribute Association: dataset 'RFTM' normalised to 'RTFM'
+dataset   Attribute Functional Relationship: 'BPIC 2019' appears inside the DomesticDeclarations block instead of as its own heading
+dataset   Case Table: 'RTFM' appears inside the BPIC 2019 block instead of as its own heading
+dataset   Case-wise Activity Occurrence: dataset 'BPIC 2017 (Loan application)' normalised to 'BPIC 2017'
+dataset   Timestamp Coincidence: dataset 'Domestic Declarations' normalised to 'DomesticDeclarations'
+dataset   Transaction Detection: 'BPIC 2017' appears inside the RTFM block instead of as its own heading
+dependency Attribute Scope: dependency 'Potential starting point' matches no pattern
+dependency Event Ordering: dependency 'Event log attribute classification' matches no pattern
+dependency Event Reordering: dependency 'Event log attribute classification' matches no pattern
+dependency Uninformative Attribute Removal: dependency 'Redundant Attribute Candidates' matches no pattern
+number    number 6.1 used by both 'Enrichment' and 'Single-event Case Enrichment'

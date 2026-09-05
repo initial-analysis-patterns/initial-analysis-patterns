@@ -1,0 +1,65 @@
+name: Build catalogue
+
+# Regenerates the website data whenever the workbook (or the build script)
+# changes, so the site always matches the current Patterns_findings.xlsx.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Patterns_findings.xlsx'
+      - 'tools/build_patterns.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install -r tools/requirements.txt
+
+      - name: Convert workbook
+        run: python tools/build_patterns.py
+
+      - name: Show data issues found in the workbook
+        run: cat docs/data/build-report.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit regenerated data
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data
+          git diff --staged --quiet || git commit -m "Rebuild catalogue data from workbook"
+          git push
+
+# To publish the site later, a repository admin enables GitHub Pages
+# (Settings -> Pages -> Deploy from a branch -> main / /docs) and uncomments
+# the job below. Remember that Pages from a private repository is publicly
+# readable unless the organisation is on GitHub Enterprise Cloud.
+#
+#  deploy:
+#    needs: build
+#    runs-on: ubuntu-latest
+#    permissions:
+#      pages: write
+#      id-token: write
+#    environment:
+#      name: github-pages
+#      url: ${{ steps.deployment.outputs.page_url }}
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          ref: main
+#      - uses: actions/configure-pages@v5
+#      - uses: actions/upload-pages-artifact@v3
+#        with:
+#          path: docs
+#      - id: deployment
+#        uses: actions/deploy-pages@v4
