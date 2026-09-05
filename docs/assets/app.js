@@ -4,6 +4,7 @@
 const REPO = 'https://github.com/mafranco2000/patterns_website/blob/main/';
 
 const DATA = window.PATTERNS;
+const NOTEBOOKS = window.NOTEBOOKS || {};
 const PATTERNS = DATA.patterns;
 const BY_SLUG = Object.fromEntries(PATTERNS.map(p => [p.slug, p]));
 
@@ -310,24 +311,44 @@ function dependencySection(p) {
 function notebookSection(p) {
   const section = el('section', 'field');
   section.appendChild(el('h3', null, 'Implementation'));
-  if (p.notebook) {
-    const link = el('a', 'nb-link', `Open ${p.notebook}`);
-    link.href = REPO + p.notebook;
-    link.target = '_blank';
-    link.rel = 'noopener';
-    section.appendChild(link);
-    const local = el('div');
-    const localLink = el('a', null, 'local copy in this clone');
-    localLink.href = '../' + p.notebook;
-    localLink.style.fontSize = '12px';
-    local.style.marginTop = '6px';
-    local.appendChild(localLink);
-    section.appendChild(local);
-  } else {
+
+  if (!p.notebook) {
     section.appendChild(el('div', 'nb-none',
       `No notebook yet. Commit ${p.slug}.ipynb to the repository root and it will appear here.`));
+    return section;
   }
+
+  const link = el('a', 'nb-link', `Open ${p.notebook}`);
+  link.href = REPO + p.notebook;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  section.appendChild(link);
+
+  const local = el('div', 'nb-local');
+  const localLink = el('a', null, 'local copy in this clone');
+  localLink.href = '../' + p.notebook;
+  local.appendChild(localLink);
+  section.appendChild(local);
+
   return section;
+}
+
+/** The rendered notebook, full width below the two text columns: code lines
+ *  and result tables need more room than the right-hand column has. */
+function notebookViewer(p) {
+  const rendered = NOTEBOOKS[p.slug];
+  if (!rendered) return null;
+
+  const box = el('details', 'nb-view');
+  box.appendChild(el('summary', null, `Read ${p.notebook}`));
+  box.appendChild(el('p', 'nb-caveat',
+    'Rendered from the committed notebook. Its outputs were produced from event logs '
+    + 'that are not part of this repository, so they record a run rather than something '
+    + 'you can reproduce from here.'));
+  const body = el('div', 'nb-body');
+  body.innerHTML = rendered;
+  box.appendChild(body);
+  return box;
 }
 
 function notesSection(p) {
@@ -421,6 +442,9 @@ function renderDetail(slug) {
   cols.appendChild(left);
   cols.appendChild(right);
   main.appendChild(cols);
+
+  const notebook = notebookViewer(p);
+  if (notebook) main.appendChild(notebook);
 
   const siblings = sortPatterns(visible());
   const index = siblings.findIndex(x => x.slug === p.slug);

@@ -1,6 +1,6 @@
-Build report - 2026-09-05 10:16
+Build report - 2026-09-05 12:30
 Source: Patterns_findings.xlsx
-33 patterns, 3 with a notebook, 46 open review comments
+33 patterns, 3 with a notebook, 46 open review comments, 3 notebooks rendered
 
 dataset   Activity Schema Overlap: dataset 'BPIC 2012 (Loan application)' normalised to 'BPIC 2012'
 dataset   Activity–Attribute Association: 'BPIC 2019' appears inside the RTFM block instead of as its own heading
