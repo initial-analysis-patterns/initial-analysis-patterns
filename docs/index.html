@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Event Log Pattern Catalogue</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="site-inner">
+    <h1>Event Log Pattern Catalogue</h1>
+    <div class="meta">
+      <label class="toggle" title="Show unresolved comments from the workbook">
+        <input type="checkbox" id="notes-toggle"> Review notes
+      </label>
+      <span id="generated"></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="filters" id="filters">
+    <input class="search" id="search" type="search" placeholder="Search patterns…" autocomplete="off" spellcheck="false">
+    <p class="hint">Press <kbd>/</kbd> to search</p>
+    <div id="filter-groups"></div>
+    <button class="reset" id="reset">Clear all filters</button>
+  </aside>
+
+  <main id="main"></main>
+</div>
+
+<footer class="site">
+  <span id="footer-note"></span>
+</footer>
+
+<script src="data/patterns.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
