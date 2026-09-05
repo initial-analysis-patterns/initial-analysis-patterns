@@ -1,5 +1,4 @@
-Build report - 2026-09-05 12:30
-Source: Patterns_findings.xlsx
+Build report for Patterns_findings.xlsx, saved 2026-09-04
 33 patterns, 3 with a notebook, 46 open review comments, 3 notebooks rendered
 
 dataset   Activity Schema Overlap: dataset 'BPIC 2012 (Loan application)' normalised to 'BPIC 2012'

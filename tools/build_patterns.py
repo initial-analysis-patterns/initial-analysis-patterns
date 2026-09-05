@@ -344,6 +344,26 @@ def load_comments(path: Path) -> dict[int, list[dict]]:
     return out
 
 
+def workbook_saved(path: Path) -> str:
+    """When the workbook was last saved, not when the build ran.
+
+    Deriving the stamp from the input keeps the build reproducible: rerunning it
+    on unchanged input produces byte-identical output, so the GitHub Action does
+    not commit a new timestamp on every run. It also answers the question the
+    reader actually has - how current is this catalogue.
+    """
+    try:
+        with zipfile.ZipFile(path) as zf:
+            core = ET.fromstring(zf.read("docProps/core.xml"))
+        for tag in ("modified", "created"):
+            found = core.find(f"{{http://purl.org/dc/terms/}}{tag}")
+            if found is not None and found.text:
+                return found.text[:10]
+    except (KeyError, ET.ParseError, zipfile.BadZipFile):
+        pass
+    return dt.date.fromtimestamp(path.stat().st_mtime).isoformat()
+
+
 def build(workbook_path: Path) -> dict:
     wb = openpyxl.load_workbook(workbook_path, rich_text=True)
     if SHEET not in wb.sheetnames:
@@ -440,7 +460,7 @@ def build(workbook_path: Path) -> dict:
             note("category", f"category {cat!r} has a single member: {members[0]}")
 
     return {
-        "generated": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generated": workbook_saved(workbook_path),
         "source": workbook_path.name,
         "status_labels": STATUS_LABELS,
         "categories": categories,
@@ -588,8 +608,7 @@ def main() -> None:
     )
 
     header = [
-        f"Build report - {data['generated']}",
-        f"Source: {data['source']}",
+        f"Build report for {data['source']}, saved {data['generated']}",
         f"{len(data['patterns'])} patterns, "
         f"{sum(1 for p in data['patterns'] if p['notebook'])} with a notebook, "
         f"{sum(p['open_comments'] for p in data['patterns'])} open review comments, "

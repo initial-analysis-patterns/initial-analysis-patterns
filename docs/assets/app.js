@@ -308,9 +308,12 @@ function dependencySection(p) {
   return section;
 }
 
-function notebookSection(p) {
-  const section = el('section', 'field');
-  section.appendChild(el('h3', null, 'Implementation'));
+/** Everything about the implementation in one full-width section below the two
+ *  text columns: the link to the runnable notebook, and the notebook itself.
+ *  Code lines and result tables need more room than the right-hand column has. */
+function implementationSection(p) {
+  const section = el('section', 'implementation');
+  section.appendChild(el('h3', 'impl-head', 'Implementation'));
 
   if (!p.notebook) {
     section.appendChild(el('div', 'nb-none',
@@ -318,37 +321,36 @@ function notebookSection(p) {
     return section;
   }
 
-  const link = el('a', 'nb-link', `Open ${p.notebook}`);
+  const links = el('div', 'impl-links');
+  const link = el('a', 'nb-link', 'Open on GitHub');
   link.href = REPO + p.notebook;
   link.target = '_blank';
   link.rel = 'noopener';
-  section.appendChild(link);
-
-  const local = el('div', 'nb-local');
-  const localLink = el('a', null, 'local copy in this clone');
+  links.appendChild(link);
+  const localLink = el('a', 'nb-local', 'local copy in this clone');
   localLink.href = '../' + p.notebook;
-  local.appendChild(localLink);
-  section.appendChild(local);
+  links.appendChild(localLink);
+  section.appendChild(links);
 
-  return section;
-}
-
-/** The rendered notebook, full width below the two text columns: code lines
- *  and result tables need more room than the right-hand column has. */
-function notebookViewer(p) {
   const rendered = NOTEBOOKS[p.slug];
-  if (!rendered) return null;
+  if (!rendered) return section;
 
-  const box = el('details', 'nb-view');
-  box.appendChild(el('summary', null, `Read ${p.notebook}`));
-  box.appendChild(el('p', 'nb-caveat',
+  // The rendering is a reading aid under the section, not a section of its own:
+  // the runnable notebook linked above stays the artefact.
+  const view = el('details', 'nb-view');
+  const summary = el('summary');
+  summary.appendChild(el('code', 'nb-file', p.notebook));
+  summary.appendChild(el('span', 'nb-action'));  // label comes from CSS, open/closed
+  view.appendChild(summary);
+  view.appendChild(el('p', 'nb-caveat',
     'Rendered from the committed notebook. Its outputs were produced from event logs '
     + 'that are not part of this repository, so they record a run rather than something '
     + 'you can reproduce from here.'));
   const body = el('div', 'nb-body');
   body.innerHTML = rendered;
-  box.appendChild(body);
-  return box;
+  view.appendChild(body);
+  section.appendChild(view);
+  return section;
 }
 
 function notesSection(p) {
@@ -432,7 +434,6 @@ function renderDetail(slug) {
 
   [
     evidenceSection(p),
-    notebookSection(p),
     dependencySection(p),
     field('Literature support', p.literature, { soft: true }),
     field('Notes', [p.notes_connection, p.notes_further].filter(Boolean).join('<br><br>'), { soft: true }),
@@ -443,8 +444,7 @@ function renderDetail(slug) {
   cols.appendChild(right);
   main.appendChild(cols);
 
-  const notebook = notebookViewer(p);
-  if (notebook) main.appendChild(notebook);
+  main.appendChild(implementationSection(p));
 
   const siblings = sortPatterns(visible());
   const index = siblings.findIndex(x => x.slug === p.slug);
@@ -485,7 +485,7 @@ function init() {
   const withNotebook = PATTERNS.filter(p => p.notebook).length;
   const openNotes = PATTERNS.reduce((n, p) => n + p.open_comments, 0);
   document.getElementById('generated').textContent =
-    `${PATTERNS.length} patterns · ${withNotebook} with notebook · built ${DATA.generated}`;
+    `${PATTERNS.length} patterns · ${withNotebook} with notebook · workbook of ${DATA.generated}`;
   document.getElementById('footer-note').textContent =
     `Generated from ${DATA.source} by tools/build_patterns.py — edit the workbook and re-run the script to update. ` +
     `${openNotes} unresolved review comments in the workbook.`;

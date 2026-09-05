@@ -537,36 +537,60 @@ kbd {
 
 /* ---------- in-page notebook ---------- */
 
-.nb-local { margin-top: 6px; font-size: 12px; }
+/* One full-width section below the two text columns, carrying both the link to
+   the runnable notebook and its rendering. Its heading is a peer of the columns,
+   so it is heavier than the small field labels inside them. */
 
-details.nb-view {
-  margin-top: 18px;
+section.implementation {
+  margin-top: 30px;
   border-top: 1px solid var(--line);
-  padding-top: 12px;
+  padding-top: 16px;
 }
 
-details.nb-view > summary { font-size: 13.5px; }
+.impl-head {
+  font-size: 16px;
+  font-weight: 620;
+  letter-spacing: -.012em;
+  color: var(--ink);
+  margin: 0 0 11px;
+}
+
+.impl-links { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.nb-local { font-size: 12px; }
+
+details.nb-view { margin-top: 12px; }
+
+details.nb-view > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+  padding: 5px 0;
+}
+
+details.nb-view > summary::-webkit-details-marker { display: none; }
+details.nb-view > summary::before { content: "▸"; font-size: 11px; }
+details.nb-view[open] > summary::before { content: "▾"; }
+details.nb-view > summary:hover .nb-file { color: var(--accent); }
+
+.nb-file {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.nb-action { font-size: 12.5px; color: var(--accent); }
+.nb-action::after { content: "show"; }
+details.nb-view[open] .nb-action::after { content: "hide"; }
+
 details.nb-view[open] .nb-body {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
   padding: 16px 18px;
 }
-
-details.nb-view > summary {
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--accent);
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-details.nb-view > summary::-webkit-details-marker { display: none; }
-details.nb-view > summary::before { content: "▸"; font-size: 11px; }
-details.nb-view[open] > summary::before { content: "▾"; }
-details.nb-view > summary:hover { text-decoration: underline; }
 
 .nb-caveat {
   font-size: 11.5px;
