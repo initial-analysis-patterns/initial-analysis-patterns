@@ -16,11 +16,12 @@ xdg-open patterns_website/docs/index.html      # Linux
 ```
 
 What it gives you over the spreadsheet: all patterns at a glance, filters
-(category, type, status, dataset the evidence comes from, has-a-notebook,
-in-marimo, has-open-questions), free-text search across every field,
-per-pattern pages with dependencies as clickable links, the implementing
-notebook readable in the page, and a **Review notes** switch that surfaces the
-unresolved Excel comments.
+(category, tags, dataset the evidence comes from), free-text search across every
+field, per-pattern pages with dependencies as clickable links, and the
+implementing notebook readable in the page.
+
+The workbook's threaded comments are internal review discussion and are
+deliberately **not** carried into the generated site.
 
 Keyboard: `/` to search, `Esc` back to the list, `←`/`→` between patterns.
 
@@ -44,14 +45,20 @@ automatically whenever a new workbook is pushed.
 
 | In the workbook | On the site |
 |---|---|
-| Sheet `Pattern Definitions & Examples `, rows 11 onwards | one pattern each |
-| Green fill in column B | status *stable* |
-| No fill in column B | status *work in progress* |
-| Orange/yellow fill on any other cell | ⚑ that field needs discussion |
-| **Bold** pattern name | "in marimo" |
+| Sheet `Pattern Definitions & Examples `, header row 9, rows 11 onwards | one pattern each |
+| *Tags* (one per line and/or comma-separated) | filterable tag chips |
 | `RTFM:`, `Sepsis:`, … in *Relevant Evidence* | evidence split per dataset, filterable |
 | *Dependencies* naming other patterns | clickable links between patterns |
-| Threaded comments | review notes (unresolved ones only) |
+| *Relation with Imperfection Patterns* | shown as a plain-text section |
+
+The columns read are *No., Category, Tags, Name, Information Need / Modification
+Objective, Motivation / Context, Preconditions, Approach, Output, Relevant
+Evidence, Dependencies* and *Relation with Imperfection Patterns*. The
+*Literature Support*, *Notes* and *Further notes* columns, and the workbook's
+threaded comments, are deliberately **not** carried onto the site.
+
+Cell fill colours and bold text in the workbook are **not** interpreted: the
+site has no status or "in marimo" markers and no per-field discussion flags.
 
 ## Adding a notebook
 

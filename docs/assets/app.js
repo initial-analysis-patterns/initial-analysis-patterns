@@ -9,21 +9,18 @@ const PATTERNS = DATA.patterns;
 const BY_SLUG = Object.fromEntries(PATTERNS.map(p => [p.slug, p]));
 
 const CAT_VAR = {};
-DATA.categories.forEach((c, i) => { CAT_VAR[c] = `var(--cat-${(i % 5) + 1})`; });
-
-const STATUS_ORDER = ['stable', 'wip', 'discussion'];
+const CAT_INDEX = {};
+DATA.categories.forEach((c, i) => {
+  CAT_VAR[c] = `var(--cat-${(i % 5) + 1})`;
+  CAT_INDEX[c] = i;
+});
 
 const state = {
   q: '',
   category: new Set(),
-  type: new Set(),
-  status: new Set(),
+  tags: new Set(),
   dataset: new Set(),
-  onlyNotebook: false,
-  onlyMarimo: false,
-  onlyOpen: false,
   sort: 'category',
-  notes: false,
 };
 
 /* ---------- helpers ---------- */
@@ -40,11 +37,11 @@ const stripTags = html => (html || '').replace(/<[^>]+>/g, ' ');
 function haystack(p) {
   if (p._hay) return p._hay;
   p._hay = [
-    p.number, p.name, p.name_old, p.category, p.category_old, p.type,
+    p.number, p.name, p.category, (p.tags || []).join(' '),
     stripTags(p.information_need), stripTags(p.motivation), stripTags(p.preconditions),
-    stripTags(p.approach), stripTags(p.output), stripTags(p.evidence),
-    p.dependencies, stripTags(p.literature), stripTags(p.notes_connection),
-    stripTags(p.notes_further), p.notebook || '',
+    stripTags(p.approach), stripTags(p.output),
+    (p.evidence_blocks || []).map(b => `${b.dataset || ''} ${stripTags(b.html)}`).join(' '),
+    p.dependencies, stripTags(p.imperfection_relation), p.notebook || '',
   ].join(' ').toLowerCase();
   return p._hay;
 }
@@ -57,14 +54,8 @@ function matches(p, skip) {
     if (!terms.every(t => hay.includes(t))) return false;
   }
   if (skip !== 'category' && state.category.size && !state.category.has(p.category)) return false;
-  if (skip !== 'type' && state.type.size && !state.type.has(p.type)) return false;
-  if (skip !== 'status' && state.status.size && !state.status.has(p.status)) return false;
+  if (skip !== 'tags' && state.tags.size && !p.tags.some(t => state.tags.has(t))) return false;
   if (skip !== 'dataset' && state.dataset.size && !p.datasets.some(d => state.dataset.has(d))) return false;
-  if (skip !== 'extra') {
-    if (state.onlyNotebook && !p.notebook) return false;
-    if (state.onlyMarimo && !p.marimo) return false;
-    if (state.onlyOpen && !p.open_comments) return false;
-  }
   return true;
 }
 
@@ -74,12 +65,8 @@ function sortPatterns(list) {
   const byNum = (a, b) => parseFloat(a.number) - parseFloat(b.number) || a.name.localeCompare(b.name);
   if (state.sort === 'number') return [...list].sort(byNum);
   if (state.sort === 'name') return [...list].sort((a, b) => a.name.localeCompare(b.name));
-  if (state.sort === 'status') {
-    return [...list].sort((a, b) =>
-      STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) || byNum(a, b));
-  }
   return [...list].sort((a, b) =>
-    a.category.localeCompare(b.category) || byNum(a, b));
+    (CAT_INDEX[a.category] - CAT_INDEX[b.category]) || byNum(a, b));
 }
 
 /* ---------- filter rail ---------- */
@@ -98,7 +85,9 @@ function filterGroup(title, key, values, decorate) {
   box.appendChild(el('h3', null, title));
   values.forEach(value => {
     const count = PATTERNS.filter(p => matches(p, key) && (
-      key === 'dataset' ? p.datasets.includes(value) : p[key === 'status' ? 'status' : key] === value
+      key === 'dataset' ? p.datasets.includes(value)
+        : key === 'tags' ? p.tags.includes(value)
+          : p[key] === value
     )).length;
     const active = state[key].has(value);
     const label = el('label', 'fopt' + (count === 0 && !active ? ' off' : ''));
@@ -110,28 +99,7 @@ function filterGroup(title, key, values, decorate) {
       const mark = decorate(value);
       if (mark) label.appendChild(mark);
     }
-    label.appendChild(el('span', null, key === 'status' ? statusName(value) : value));
-    label.appendChild(el('span', 'n', String(count)));
-    box.appendChild(label);
-  });
-  return box;
-}
-
-const statusName = s => ({ stable: 'Stable', wip: 'Work in progress', discussion: 'Needs discussion' }[s] || s);
-
-function extraGroup() {
-  const box = el('div', 'fgroup');
-  box.appendChild(el('h3', null, 'Also'));
-  const opts = [
-    ['onlyNotebook', 'Has notebook', p => !!p.notebook],
-    ['onlyMarimo', 'In marimo', p => p.marimo],
-    ['onlyOpen', 'Open questions', p => p.open_comments > 0],
-  ];
-  opts.forEach(([key, text, test]) => {
-    const count = PATTERNS.filter(p => matches(p, 'extra') && test(p)).length;
-    const label = el('label', 'fopt' + (count === 0 && !state[key] ? ' off' : ''));
-    label.appendChild(checkbox(key, state[key], () => { state[key] = !state[key]; render(); }));
-    label.appendChild(el('span', null, text));
+    label.appendChild(el('span', null, value));
     label.appendChild(el('span', 'n', String(count)));
     box.appendChild(label);
   });
@@ -146,11 +114,7 @@ function renderFilters() {
     dot.style.background = CAT_VAR[value];
     return dot;
   }));
-  host.appendChild(filterGroup('Type', 'type', DATA.types));
-  host.appendChild(filterGroup('Status', 'status',
-    STATUS_ORDER.filter(s => PATTERNS.some(p => p.status === s)),
-    value => el('span', `dot ${value}`)));
-  host.appendChild(extraGroup());
+  if (DATA.tags.length) host.appendChild(filterGroup('Tags', 'tags', DATA.tags));
   host.appendChild(filterGroup('Evidence from', 'dataset', DATA.datasets));
 }
 
@@ -159,14 +123,6 @@ function renderFilters() {
 function categoryChip(p) {
   const chip = el('span', 'chip cat', p.category);
   chip.style.color = CAT_VAR[p.category];
-  return chip;
-}
-
-function statusChip(p) {
-  const chip = el('span', 'chip');
-  chip.appendChild(el('span', `dot ${p.status}`));
-  chip.appendChild(el('span', null, statusName(p.status)));
-  chip.title = DATA.status_labels[p.status] || '';
   return chip;
 }
 
@@ -179,12 +135,7 @@ function card(p) {
   node.addEventListener('click', () => { location.hash = `#/p/${p.slug}`; });
 
   const top = el('div', 'card-top');
-  top.appendChild(el('span', 'dot ' + p.status));
   top.appendChild(el('span', null, p.number));
-  top.appendChild(el('span', null, '·'));
-  const type = el('span', null, p.type);
-  type.style.color = p.type === 'Modification' ? 'var(--accent)' : '';
-  top.appendChild(type);
   node.appendChild(top);
 
   node.appendChild(el('h3', null, p.name));
@@ -194,12 +145,8 @@ function card(p) {
   // When the list is grouped by category the chip only repeats the heading;
   // the coloured card edge carries the category instead.
   if (state.sort !== 'category') foot.appendChild(categoryChip(p));
+  p.tags.forEach(t => foot.appendChild(el('span', 'chip tag', t)));
   if (p.notebook) foot.appendChild(el('span', 'chip nb', 'notebook'));
-  if (p.marimo) foot.appendChild(el('span', 'chip', 'marimo'));
-  if (p.flagged_fields.length) foot.appendChild(el('span', 'chip flagged', '⚑ ' + p.flagged_fields.join(', ')));
-  if (state.notes && p.open_comments) {
-    foot.appendChild(el('span', 'chip q', `${p.open_comments} open`));
-  }
   node.appendChild(foot);
   return node;
 }
@@ -216,7 +163,7 @@ function renderList() {
     `${list.length} of ${PATTERNS.length} patterns`));
   const sortLabel = el('label', null, 'Sort by ');
   const select = el('select');
-  [['category', 'category'], ['number', 'number'], ['name', 'name'], ['status', 'status']]
+  [['category', 'category'], ['number', 'number'], ['name', 'name']]
     .forEach(([value, text]) => {
       const opt = el('option', null, text);
       opt.value = value;
@@ -259,12 +206,7 @@ function renderList() {
 function field(title, html, opts = {}) {
   if (!html || !stripTags(html).trim()) return null;
   const section = el('section', 'field');
-  const head = el('h3', null, title);
-  if (opts.flagged) {
-    const flag = el('span', 'chip flagged', '⚑ needs discussion');
-    head.appendChild(flag);
-  }
-  section.appendChild(head);
+  section.appendChild(el('h3', null, title));
   const body = el('div', 'body' + (opts.soft ? ' soft' : ''));
   body.innerHTML = html;
   section.appendChild(body);
@@ -274,11 +216,7 @@ function field(title, html, opts = {}) {
 function evidenceSection(p) {
   if (!p.evidence_blocks.length) return null;
   const section = el('section', 'field');
-  const head = el('h3', null, 'Relevant evidence');
-  if (p.flagged_fields.includes('Relevant Evidence')) {
-    head.appendChild(el('span', 'chip flagged', '⚑ needs discussion'));
-  }
-  section.appendChild(head);
+  section.appendChild(el('h3', null, 'Relevant evidence'));
   p.evidence_blocks.forEach(block => {
     const box = el('div', 'evidence-block');
     if (block.dataset) box.appendChild(el('div', 'ds', block.dataset));
@@ -353,34 +291,6 @@ function implementationSection(p) {
   return section;
 }
 
-function notesSection(p) {
-  const open = p.comments.filter(c => !c.resolved);
-  if (!open.length) return null;
-  const section = el('section', 'field');
-  section.appendChild(el('h3', null, `Review notes (${open.length} open)`));
-  const threads = [];
-  open.forEach(c => {
-    const last = threads[threads.length - 1];
-    if (last && last[0].thread === c.thread) last.push(c);
-    else threads.push([c]);
-  });
-  threads.forEach(thread => {
-    const box = el('div', 'note-thread');
-    box.appendChild(el('div', 'note-field', `on ${thread[0].field}`));
-    thread.forEach(c => {
-      const note = el('div', 'note' + (c.is_reply ? ' reply' : ''));
-      const who = el('div', 'who');
-      who.appendChild(el('b', null, c.author));
-      who.appendChild(el('span', null, c.date));
-      note.appendChild(who);
-      note.appendChild(el('div', null, c.text));
-      box.appendChild(note);
-    });
-    section.appendChild(box);
-  });
-  return section;
-}
-
 function renderDetail(slug) {
   const p = BY_SLUG[slug];
   const main = document.getElementById('main');
@@ -401,43 +311,27 @@ function renderDetail(slug) {
   head.appendChild(el('h2', null, p.name));
   const chips = el('div', 'chips');
   chips.appendChild(categoryChip(p));
-  chips.appendChild(el('span', 'chip' + (p.type === 'Modification' ? ' type-modification' : ''), p.type));
-  chips.appendChild(statusChip(p));
-  if (p.marimo) chips.appendChild(el('span', 'chip', 'in marimo'));
+  p.tags.forEach(t => chips.appendChild(el('span', 'chip tag', t)));
   if (p.notebook) chips.appendChild(el('span', 'chip nb', 'notebook'));
-  // Fields flagged in the workbook that have no section of their own
-  // (the name and the number) are surfaced here instead.
-  const headless = p.flagged_fields.filter(f => ['No.', 'Name', 'Name (old)', 'Category', 'Type'].includes(f));
-  if (headless.length) {
-    chips.appendChild(el('span', 'chip flagged', `⚑ ${headless.join(', ')} needs discussion`));
-  }
   head.appendChild(chips);
-  const oldName = (p.name_old || '').replace(/^NEW:\s*/, '').trim();
-  if (oldName && oldName.toLowerCase() !== p.name.toLowerCase() && oldName !== 'NEW') {
-    head.appendChild(el('div', 'oldname', `Previously: ${oldName}` +
-      (p.category_old ? ` · category ${p.category_old}` : '')));
-  }
   main.appendChild(head);
 
   const cols = el('div', 'cols');
   const left = el('div');
   const right = el('div');
 
-  const objective = p.type === 'Modification' ? 'Modification objective' : 'Information need';
   [
-    field(objective, p.information_need, { flagged: p.flagged_fields.includes('Information Need') }),
-    field('Motivation & context', p.motivation, { flagged: p.flagged_fields.includes('Motivation / Context') }),
-    field('Preconditions', p.preconditions, { flagged: p.flagged_fields.includes('Preconditions') }),
-    field('Approach', p.approach, { flagged: p.flagged_fields.includes('Approach') }),
-    field('Output', p.output, { flagged: p.flagged_fields.includes('Output') }),
+    field('Information need / modification objective', p.information_need),
+    field('Motivation & context', p.motivation),
+    field('Preconditions', p.preconditions),
+    field('Approach', p.approach),
+    field('Output', p.output),
   ].forEach(node => node && left.appendChild(node));
 
   [
     evidenceSection(p),
     dependencySection(p),
-    field('Literature support', p.literature, { soft: true }),
-    field('Notes', [p.notes_connection, p.notes_further].filter(Boolean).join('<br><br>'), { soft: true }),
-    state.notes ? notesSection(p) : null,
+    field('Relation with imperfection patterns', p.imperfection_relation, { soft: true }),
   ].forEach(node => node && right.appendChild(node));
 
   cols.appendChild(left);
@@ -483,12 +377,10 @@ function render() {
 
 function init() {
   const withNotebook = PATTERNS.filter(p => p.notebook).length;
-  const openNotes = PATTERNS.reduce((n, p) => n + p.open_comments, 0);
   document.getElementById('generated').textContent =
     `${PATTERNS.length} patterns · ${withNotebook} with notebook · workbook of ${DATA.generated}`;
   document.getElementById('footer-note').textContent =
-    `Generated from ${DATA.source} by tools/build_patterns.py — edit the workbook and re-run the script to update. ` +
-    `${openNotes} unresolved review comments in the workbook.`;
+    `Generated from ${DATA.source} by tools/build_patterns.py — edit the workbook and re-run the script to update.`;
 
   const search = document.getElementById('search');
   search.addEventListener('input', () => {
@@ -497,16 +389,10 @@ function init() {
     else render();
   });
 
-  document.getElementById('notes-toggle').addEventListener('change', event => {
-    state.notes = event.target.checked;
-    render();
-  });
-
   document.getElementById('reset').addEventListener('click', () => {
     state.q = '';
     search.value = '';
-    ['category', 'type', 'status', 'dataset'].forEach(k => state[k].clear());
-    state.onlyNotebook = state.onlyMarimo = state.onlyOpen = false;
+    ['category', 'tags', 'dataset'].forEach(k => state[k].clear());
     render();
   });
 

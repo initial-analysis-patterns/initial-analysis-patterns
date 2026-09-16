@@ -33,6 +33,8 @@ from openpyxl.cell.rich_text import CellRichText
 REPO = Path(__file__).resolve().parent.parent
 WORKBOOK = REPO / "Patterns_findings.xlsx"
 SHEET = "Pattern Definitions & Examples "
+# Per-event-log evidence lives on its own sheet, joined to the catalogue by No.
+EVIDENCE_SHEET = "EventLog Analysis Results"
 OUT_JS = REPO / "docs" / "data" / "patterns.js"
 OUT_NOTEBOOKS = REPO / "docs" / "data" / "notebooks.js"
 OUT_REPORT = REPO / "docs" / "data" / "build-report.txt"
@@ -40,58 +42,32 @@ OUT_REPORT = REPO / "docs" / "data" / "build-report.txt"
 HEADER_ROW = 9
 FIRST_DATA_ROW = 11
 
-# Workbook column -> key used by the website.
-COLUMNS = {
-    2: "number",
-    3: "category_old",
-    4: "category",
-    5: "type",
-    6: "name_old",
-    7: "name",
-    8: "information_need",
-    9: "motivation",
-    10: "preconditions",
-    11: "approach",
-    12: "output",
-    13: "evidence",
-    14: "dependencies",
-    15: "literature",
-    16: "implementation",
-    17: "notes_connection",
-    18: "notes_further",
+# Website field key -> exact header text in the workbook's header row (row 9).
+# Columns are matched by header, not by position, so they can be reordered in
+# Excel without touching this file. Matching is case-insensitive and ignores
+# differences in surrounding/internal whitespace. Any column whose header is not
+# listed here (Relevant Evidence, Literature Support, Notes, …) is deliberately
+# not carried onto the site: the evidence comes from EVIDENCE_SHEET instead.
+FIELD_HEADERS = {
+    "number": "No.",
+    "category": "Category",
+    "tags": "Tags",
+    "name": "Name",
+    "information_need": "Information Need / Modification Objective",
+    "motivation": "Motivation / Context",
+    "preconditions": "Preconditions",
+    "approach": "Approach",
+    "output": "Output",
+    "dependencies": "Dependencies",
+    "imperfection_relation": "Relation with Imperfection Patterns",
 }
 
-# Human labels for the columns, used when attaching review comments.
-COLUMN_LABELS = {
-    2: "No.",
-    3: "Category (old)",
-    4: "Category",
-    5: "Type",
-    6: "Name (old)",
-    7: "Name",
-    8: "Information Need",
-    9: "Motivation / Context",
-    10: "Preconditions",
-    11: "Approach",
-    12: "Output",
-    13: "Relevant Evidence",
-    14: "Dependencies",
-    15: "Literature Support",
-    16: "Implementation",
-    17: "Notes (connection)",
-    18: "Further notes",
+# Fields whose cells carry formatting worth keeping (bold/italic, ink colours,
+# line breaks); the rest are read as plain text.
+RICH_FIELDS = {
+    "information_need", "motivation", "preconditions", "approach", "output",
+    "imperfection_relation",
 }
-
-# Fills used as status markers in the workbook (legend in cells J3:J5).
-# Theme indices: 9 = accent6 (green), 5 = accent2 (orange).
-STATUS_BY_THEME = {9: "stable", 5: "discussion"}
-STATUS_LABELS = {
-    "stable": "Stable — checked, implemented, evidence provided",
-    "wip": "Work in progress",
-    "discussion": "Needs discussion / input",
-}
-
-NS_TC = "{http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments}"
 
 report_lines: list[str] = []
 
@@ -162,54 +138,12 @@ def plain(value) -> str:
     return "" if value is None else str(value).strip()
 
 
-def read_status(cell) -> str:
-    fill = cell.fill
-    if fill is None or fill.fill_type is None:
-        return "wip"
-    fg = fill.fgColor
-    if fg.type == "theme":
-        return STATUS_BY_THEME.get(fg.theme, "wip")
-    if fg.type == "rgb":
-        rgb = rgb_of(fg)
-        if rgb in {"70AD47", "92D050", "00B050"}:
-            return "stable"
-        if rgb in {"ED7D31", "FFC000", "FFFF00"}:
-            return "discussion"
-    return "wip"
+# Evidence cells holding one of these (after stripping tags, whitespace and a
+# trailing full stop, case-insensitively) carry no real content and are dropped.
+BLANK_EVIDENCE = {"", "n/a", "na", "nothing relevant identified"}
 
-
-DATASET_ALIASES = {
-    "rftm": "RTFM",
-    "rtfm": "RTFM",
-    "sepsis": "Sepsis",
-    "domesticdeclarations": "DomesticDeclarations",
-    "domestic_declarations": "DomesticDeclarations",
-    "bpic_2011": "BPIC 2011",
-    "bpic_2012": "BPIC 2012",
-    "bpic_2012_loan_application": "BPIC 2012",
-    "bpic_2015": "BPIC 2015",
-    "bpic_2017": "BPIC 2017",
-    "bpic_2017_loan_application": "BPIC 2017",
-    "bpic_2018": "BPIC 2018",
-    "bpic_2019": "BPIC 2019",
-}
-
-# Datasets are marked in the evidence cell as a bold run ending in a colon,
-# e.g. "<strong>RTFM:</strong>". Cells without formatting fall back to a plain
-# line ending in a colon.
-BOLD_HEADING = re.compile(r"<strong>\s*([^<:]{2,45?}):?\s*</strong>\s*(?:<br>)*", re.I)
-LINE_HEADING = re.compile(r"^\s*([A-Za-z0-9 ()_\-\.]{2,45})\s*:\s*$")
-
-
-def canonical_dataset(label: str, pattern_name: str) -> str:
-    key = slugify(label)
-    canonical = DATASET_ALIASES.get(key)
-    if canonical is None:
-        note("dataset", f"{pattern_name}: unrecognised dataset heading {label!r}")
-        return label
-    if canonical.lower() != label.lower():
-        note("dataset", f"{pattern_name}: dataset {label!r} normalised to {canonical!r}")
-    return canonical
+# Columns on the evidence sheet that are not event logs.
+EVIDENCE_META_HEADERS = {"no.", "no", "number", "category", "pattern name", "name"}
 
 
 def _tidy(html: str) -> str:
@@ -217,52 +151,84 @@ def _tidy(html: str) -> str:
     return html.strip()
 
 
-def split_evidence(html: str, pattern_name: str) -> list[dict]:
-    """Split the evidence cell into one block per dataset."""
-    if not html.strip():
-        return []
+def _is_blank_evidence(html: str) -> bool:
+    """True when an evidence cell says nothing worth showing."""
+    text = re.sub(r"<[^>]+>", " ", html or "")
+    text = re.sub(r"\s+", " ", text).strip().rstrip(".").strip().lower()
+    return text in BLANK_EVIDENCE
 
-    blocks: list[dict] = []
-    matches = list(BOLD_HEADING.finditer(html))
-    # Only treat bold runs as headings if they look like dataset names.
-    matches = [m for m in matches if slugify(m.group(1)) in DATASET_ALIASES]
 
-    if matches:
-        if matches[0].start() > 0:
-            lead = _tidy(html[: matches[0].start()])
-            if lead:
-                blocks.append({"dataset": None, "html": lead})
-        for i, m in enumerate(matches):
-            stop = matches[i + 1].start() if i + 1 < len(matches) else len(html)
-            body = _tidy(html[m.end(): stop])
-            if body:
-                blocks.append({"dataset": canonical_dataset(m.group(1), pattern_name), "html": body})
-    else:
-        current = {"dataset": None, "html": []}
-        for line in html.split("<br>"):
-            bare = re.sub(r"<[^>]+>", "", line).strip()
-            m = LINE_HEADING.match(bare)
-            if m and slugify(m.group(1)) in DATASET_ALIASES:
-                if any(x.strip() for x in current["html"]):
-                    blocks.append({"dataset": current["dataset"],
-                                   "html": _tidy("<br>".join(current["html"]))})
-                current = {"dataset": canonical_dataset(m.group(1), pattern_name), "html": []}
-            else:
-                current["html"].append(line)
-        if any(x.strip() for x in current["html"]):
-            blocks.append({"dataset": current["dataset"],
-                           "html": _tidy("<br>".join(current["html"]))})
+def _pretty_dataset(header: str) -> str:
+    """Tidy an event-log column header: one space after 'BPIC', whitespace collapsed."""
+    label = re.sub(r"\s+", " ", str(header or "")).strip()
+    return re.sub(r"^(BPIC)\s*(?=\d)", r"\1 ", label)
 
-    blocks = [b for b in blocks if b["html"]]
 
-    # Flag dataset names mentioned mid-text instead of as a heading.
-    for b in blocks:
-        bare = re.sub(r"<[^>]+>", "", b["html"])
-        for other in set(DATASET_ALIASES.values()):
-            if other != b["dataset"] and re.search(rf"\b{re.escape(other)}\s*:", bare):
-                note("dataset", f"{pattern_name}: {other!r} appears inside the "
-                                f"{b['dataset'] or 'unlabelled'} block instead of as its own heading")
-    return blocks
+def load_evidence(wb) -> tuple[dict[str, list[dict]], dict[str, str]]:
+    """Read per-event-log evidence from the EVIDENCE_SHEET, keyed by pattern No.
+
+    Returns (evidence_by_number, name_by_number). Each evidence value is a list
+    of {dataset, html} blocks, one per event-log column that holds real content;
+    empty, "N/A" and "Nothing relevant identified" cells are dropped. Columns are
+    located by header (so the sheet can be reordered) and the join to the
+    catalogue is on the pattern number.
+    """
+    if EVIDENCE_SHEET not in wb.sheetnames:
+        note("evidence", f"sheet {EVIDENCE_SHEET!r} not found; no per-log evidence loaded")
+        return {}, {}
+    ws = wb[EVIDENCE_SHEET]
+
+    num_col = name_col = None
+    log_cols: list[tuple[int, str]] = []
+    for col in range(1, ws.max_column + 1):
+        header = re.sub(r"\s+", " ", str(ws.cell(1, col).value or "")).strip()
+        key = header.lower()
+        if key in {"no.", "no", "number"}:
+            num_col = col
+        elif key in {"pattern name", "name"}:
+            name_col = col
+        elif key and key not in EVIDENCE_META_HEADERS:
+            log_cols.append((col, _pretty_dataset(header)))
+    if num_col is None:
+        note("evidence", f"{EVIDENCE_SHEET}: no 'No.' column found; cannot join evidence")
+        return {}, {}
+
+    evidence: dict[str, list[dict]] = {}
+    names: dict[str, str] = {}
+    for row in range(2, ws.max_row + 1):
+        number = plain(ws.cell(row, num_col).value)
+        # Skip section-header rows: a No. (e.g. "1") with a category but no
+        # pattern name. Real evidence rows always name a pattern.
+        row_name = plain(ws.cell(row, name_col).value) if name_col is not None else ""
+        if not number or (name_col is not None and not row_name):
+            continue
+        if number in evidence:
+            note("evidence", f"{EVIDENCE_SHEET}: pattern number {number} appears in more than one row")
+        blocks = []
+        for col, label in log_cols:
+            html = rich_to_html(ws.cell(row, col).value)
+            if _is_blank_evidence(html):
+                continue
+            blocks.append({"dataset": label, "html": _tidy(html)})
+        evidence[number] = blocks
+        if row_name:
+            names[number] = row_name
+    return evidence, names
+
+
+def split_tags(raw: str) -> list[str]:
+    """Tags are free text: one per line and/or comma-separated, order preserved.
+
+    A value like "Analysis\\nModification" becomes two tags. Duplicates within a
+    cell are collapsed while keeping the first occurrence's order.
+    """
+    tags: list[str] = []
+    for line in (raw or "").split("\n"):
+        for piece in line.split(","):
+            piece = piece.strip()
+            if piece and piece not in tags:
+                tags.append(piece)
+    return tags
 
 
 def split_dependencies(raw: str) -> list[str]:
@@ -280,68 +246,6 @@ def split_dependencies(raw: str) -> list[str]:
             if piece:
                 parts.append(piece)
     return parts
-
-
-def load_comments(path: Path) -> dict[int, list[dict]]:
-    """Read threaded comments from the workbook, keyed by worksheet row."""
-    with zipfile.ZipFile(path) as zf:
-        names = zf.namelist()
-        people = {}
-        if "xl/persons/person.xml" in names:
-            root = ET.fromstring(zf.read("xl/persons/person.xml"))
-            for person in root:
-                people[person.get("id")] = person.get("displayName", "")
-
-        # sheet1.xml is the main sheet; find which threadedComment file belongs to it.
-        target = None
-        rels = "xl/worksheets/_rels/sheet1.xml.rels"
-        if rels in names:
-            root = ET.fromstring(zf.read(rels))
-            for rel in root:
-                t = rel.get("Target", "")
-                if "threadedComment" in t:
-                    target = "xl/" + t.replace("../", "")
-        if target is None or target not in names:
-            return {}
-
-        root = ET.fromstring(zf.read(target))
-        raw = []
-        for tc in root:
-            text_el = tc.find(f"{NS_TC}text")
-            raw.append(
-                {
-                    "id": tc.get("id"),
-                    "parent": tc.get("parentId"),
-                    "ref": tc.get("ref", ""),
-                    "date": (tc.get("dT") or "")[:10],
-                    "author": people.get(tc.get("personId"), "Unknown"),
-                    "resolved": tc.get("done") == "1",
-                    "text": (text_el.text or "").strip() if text_el is not None else "",
-                }
-            )
-
-    # A reply inherits the resolved state of its thread root.
-    by_id = {c["id"]: c for c in raw}
-    for c in raw:
-        root_c = c
-        while root_c.get("parent") and root_c["parent"] in by_id:
-            root_c = by_id[root_c["parent"]]
-        c["resolved"] = root_c["resolved"]
-        c["thread"] = root_c["id"]
-
-    out: dict[int, list[dict]] = {}
-    for c in raw:
-        m = re.match(r"([A-Z]+)(\d+)", c["ref"])
-        if not m:
-            continue
-        col = 0
-        for ch in m.group(1):
-            col = col * 26 + (ord(ch) - 64)
-        row = int(m.group(2))
-        c["field"] = COLUMN_LABELS.get(col, m.group(1))
-        c["is_reply"] = bool(c.get("parent"))
-        out.setdefault(row, []).append(c)
-    return out
 
 
 def workbook_saved(path: Path) -> str:
@@ -364,32 +268,61 @@ def workbook_saved(path: Path) -> str:
     return dt.date.fromtimestamp(path.stat().st_mtime).isoformat()
 
 
+def _norm_header(value) -> str:
+    """Normalise a header cell for matching: collapse whitespace, lower-case."""
+    return re.sub(r"\s+", " ", str(value or "")).strip().lower()
+
+
+def resolve_columns(ws) -> dict[int, str]:
+    """Map each website field to its workbook column by matching the header row.
+
+    Returns {column index: field key}. A header listed in FIELD_HEADERS but not
+    found in the sheet is reported (so a renamed or removed column is caught)
+    rather than silently dropped.
+    """
+    header_to_col: dict[str, int] = {}
+    for col in range(1, ws.max_column + 1):
+        header = _norm_header(ws.cell(HEADER_ROW, col).value)
+        if header:
+            header_to_col.setdefault(header, col)
+
+    columns: dict[int, str] = {}
+    for key, header in FIELD_HEADERS.items():
+        col = header_to_col.get(_norm_header(header))
+        if col is None:
+            note("column", f"header {header!r} not found in row {HEADER_ROW}; {key} left blank")
+            continue
+        columns[col] = key
+    return columns
+
+
 def build(workbook_path: Path) -> dict:
     wb = openpyxl.load_workbook(workbook_path, rich_text=True)
     if SHEET not in wb.sheetnames:
         raise SystemExit(f"sheet {SHEET!r} not found; sheets are {wb.sheetnames}")
     ws = wb[SHEET]
-    comments_by_row = load_comments(workbook_path)
+    columns = resolve_columns(ws)
+    evidence_by_number, evidence_names = load_evidence(wb)
 
     notebooks = {slugify(p.stem): p.name for p in sorted(REPO.glob("*.ipynb"))}
     used_notebooks: set[str] = set()
 
     patterns = []
     for row in range(FIRST_DATA_ROW, ws.max_row + 1):
-        if all(ws.cell(row, col).value in (None, "") for col in COLUMNS):
+        if all(ws.cell(row, col).value in (None, "") for col in columns):
             continue
 
-        record = {}
-        for col, key in COLUMNS.items():
+        # Every field defaults to blank, so a column missing from the sheet
+        # yields an empty value instead of a KeyError downstream.
+        record = {key: "" for key in FIELD_HEADERS}
+        for col, key in columns.items():
             cell = ws.cell(row, col)
-            if key in {"evidence", "motivation", "approach", "information_need",
-                       "output", "preconditions", "literature",
-                       "notes_connection", "notes_further"}:
+            if key in RICH_FIELDS:
                 record[key] = rich_to_html(cell.value)
             else:
                 record[key] = plain(cell.value)
 
-        name = record["name"] or record["name_old"]
+        name = record["name"]
         if not name:
             note("skip", f"row {row}: no name, skipped")
             continue
@@ -397,41 +330,22 @@ def build(workbook_path: Path) -> dict:
         slug = slugify(name)
         record["slug"] = slug
         record["row"] = row
-        record["status"] = read_status(ws.cell(row, 2))
-        # Individual cells highlighted orange/yellow mark a field that still
-        # needs discussion (legend in J5), independent of the row status.
-        record["flagged_fields"] = [
-            COLUMN_LABELS[col]
-            for col in COLUMNS
-            if col != 2 and read_status(ws.cell(row, col)) == "discussion"
-        ]
-        record["marimo"] = bool(ws.cell(row, 7).font.bold)
-        record["evidence_blocks"] = split_evidence(record["evidence"], name)
+        record["tags"] = split_tags(record["tags"])
+        # Evidence comes from EVIDENCE_SHEET, joined on the pattern number.
+        record["evidence_blocks"] = evidence_by_number.get(record["number"], [])
         record["datasets"] = sorted(
             {b["dataset"] for b in record["evidence_blocks"] if b["dataset"]}
         )
         record["dependency_names"] = split_dependencies(record["dependencies"])
-
         notebook = notebooks.get(slug)
         if notebook:
             used_notebooks.add(notebook)
         record["notebook"] = notebook
-        if record["implementation"] and not notebook:
-            note("notebook", f"{name}: workbook links an implementation but no {slug}.ipynb in the repo")
 
-        record["comments"] = sorted(
-            comments_by_row.get(row, []),
-            key=lambda c: (c["thread"], c["date"]),
-        )
-        record["open_comments"] = sum(1 for c in record["comments"] if not c["resolved"])
         patterns.append(record)
 
-    # Resolve dependency names against the catalogue (old and new names).
-    index = {}
-    for p in patterns:
-        index[slugify(p["name"])] = p["slug"]
-        if p["name_old"]:
-            index.setdefault(slugify(re.sub(r"^NEW:\s*", "", p["name_old"])), p["slug"])
+    # Resolve dependency names against the catalogue by pattern name.
+    index = {slugify(p["name"]): p["slug"] for p in patterns}
     for p in patterns:
         resolved = []
         for dep in p["dependency_names"]:
@@ -453,7 +367,35 @@ def build(workbook_path: Path) -> dict:
     for name in sorted(set(notebooks.values()) - used_notebooks):
         note("notebook", f"{name} is in the repo but matches no pattern name")
 
-    categories = sorted({p["category"] for p in patterns if p["category"]})
+    # Cross-check the evidence sheet against the catalogue (join is on the number).
+    pattern_numbers = {p["number"] for p in patterns}
+    for p in patterns:
+        if p["number"] not in evidence_by_number:
+            note("evidence", f"{p['name']} (No. {p['number']}): no row in {EVIDENCE_SHEET}")
+        elif not p["evidence_blocks"]:
+            note("evidence", f"{p['name']} (No. {p['number']}): evidence row has no usable content")
+        other = evidence_names.get(p["number"], "")
+        if other and slugify(other) != slugify(p["name"]):
+            note("evidence", f"No. {p['number']}: name differs between sheets "
+                             f"({p['name']!r} vs {other!r} on {EVIDENCE_SHEET})")
+    for number in sorted(set(evidence_by_number) - pattern_numbers):
+        label = evidence_names.get(number, "")
+        note("evidence", f"{EVIDENCE_SHEET} row No. {number} ({label!r}) matches no pattern")
+
+    # Order categories by the lowest pattern number they contain, so the
+    # catalogue reads 1.x, 2.x, 3.x … rather than alphabetically. Categories
+    # with no numeric pattern fall to the end; ties break on the name.
+    def _num_key(value: str) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return float("inf")
+
+    def _category_key(cat: str) -> tuple[float, str]:
+        nums = [_num_key(p["number"]) for p in patterns if p["category"] == cat]
+        return (min(nums, default=float("inf")), cat)
+
+    categories = sorted({p["category"] for p in patterns if p["category"]}, key=_category_key)
     for cat in categories:
         members = [p["name"] for p in patterns if p["category"] == cat]
         if len(members) == 1:
@@ -462,9 +404,8 @@ def build(workbook_path: Path) -> dict:
     return {
         "generated": workbook_saved(workbook_path),
         "source": workbook_path.name,
-        "status_labels": STATUS_LABELS,
         "categories": categories,
-        "types": sorted({p["type"] for p in patterns if p["type"]}),
+        "tags": sorted({t for p in patterns for t in p["tags"]}),
         "datasets": sorted({d for p in patterns for d in p["datasets"]}),
         "patterns": patterns,
     }
@@ -611,7 +552,6 @@ def main() -> None:
         f"Build report for {data['source']}, saved {data['generated']}",
         f"{len(data['patterns'])} patterns, "
         f"{sum(1 for p in data['patterns'] if p['notebook'])} with a notebook, "
-        f"{sum(p['open_comments'] for p in data['patterns'])} open review comments, "
         f"{len(notebooks)} notebooks rendered",
         "",
     ]
