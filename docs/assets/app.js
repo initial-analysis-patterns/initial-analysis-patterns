@@ -1,7 +1,7 @@
 /* Event Log Pattern Catalogue — reads window.PATTERNS from data/patterns.js.
    No build step, no dependencies; works from file:// and from a web server. */
 
-const REPO = 'https://github.com/mafranco2000/patterns_website/blob/main/';
+const REPO = 'https://github.com/initial-analysis-patterns/initial-analysis-patterns/blob/main/';
 
 const DATA = window.PATTERNS;
 const NOTEBOOKS = window.NOTEBOOKS || {};

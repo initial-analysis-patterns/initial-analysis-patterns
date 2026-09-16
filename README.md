@@ -10,9 +10,9 @@ install, no internet connection needed — the whole catalogue is in
 `docs/data/patterns.js`.
 
 ```
-git clone https://github.com/mafranco2000/patterns_website.git
-open patterns_website/docs/index.html          # macOS
-xdg-open patterns_website/docs/index.html      # Linux
+git clone https://github.com/initial-analysis-patterns/initial-analysis-patterns.git
+open initial-analysis-patterns/docs/index.html          # macOS
+xdg-open initial-analysis-patterns/docs/index.html      # Linux
 ```
 
 What it gives you over the spreadsheet: all patterns at a glance, filters
