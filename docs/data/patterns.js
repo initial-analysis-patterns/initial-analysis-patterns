@@ -103,93 +103,12 @@ window.PATTERNS = {
    "dependency_links": [
     {
      "label": "Log and Case Attribute Candidates",
-     "slug": "log_and_case_attribute_candidates"
-    }
-   ]
-  },
-  {
-   "number": "1.2",
-   "category": "Activity Schema Analysis",
-   "tags": [
-    "Analysis"
-   ],
-   "name": "Log and Case Attribute Candidates",
-   "information_need": "Identify attributes that are likely to represent  log-level or case-level properties.",
-   "motivation": "Event logs may not explicitly or reliably distinguish log-level and case-level from event-level attributes. Identifying attributes that remain constant within the log and cases helps analysts understand the log structure and determine which attributes characterize the entire log or entire process instances and therefore must not be analyzed on the event level.",
-   "preconditions": "N/A",
-   "approach": "Identify evidence that an attribute might represent log-level or case-level information, considering explicit log- and case-level designation, and whether its value remains constant within the log or within each case.",
-   "output": "The set of attributes identified as candidate log and case attributes, respectively.",
-   "dependencies": "None",
-   "imperfection_relation": "",
-   "slug": "log_and_case_attribute_candidates",
-   "row": 12,
-   "evidence_blocks": [
-    {
-     "dataset": "RTFM",
-     "html": "7 candidate case attributes"
-    },
-    {
-     "dataset": "Sepsis",
-     "html": "24 candidate case attributes, e.g., age, which is an attribute loosely (i.e., not strictly) associated with several activity types in the event log is unique per case, which makes it a case attribute candidate.."
-    },
-    {
-     "dataset": "BPIC 2011",
-     "html": "118 case attributes"
-    },
-    {
-     "dataset": "BPIC 2012",
-     "html": "2 case attributes"
-    },
-    {
-     "dataset": "BPIC 2013",
-     "html": "Identified 3 case level attributes: impact, organization country &amp; product. <br>All three are quite reasonable. <br><br>No log level attributes."
-    },
-    {
-     "dataset": "BPIC 2015_1",
-     "html": "15 case attributes, 1 candidate"
-    },
-    {
-     "dataset": "BPIC 2017",
-     "html": "3 case attributes"
-    },
-    {
-     "dataset": "BPIC 2018",
-     "html": "62 candidates case attributes identified and 4 candidate log attributes."
-    },
-    {
-     "dataset": "BPIC 2019",
-     "html": "2 attributes (case:Purch. Doc. Category name,  case:Source) are unique for the complete log. <br><br>15 other attributes are case level attributes."
-    },
-    {
-     "dataset": "BPIC 2020",
-     "html": "4 case attributes and <br>Attribute \"case:BudgetNumber\" has a unique non-null value across the log, which makes it a log attribute candidate."
-    }
-   ],
-   "datasets": [
-    "BPIC 2011",
-    "BPIC 2012",
-    "BPIC 2013",
-    "BPIC 2015_1",
-    "BPIC 2017",
-    "BPIC 2018",
-    "BPIC 2019",
-    "BPIC 2020",
-    "RTFM",
-    "Sepsis"
-   ],
-   "dependency_names": [
-    "None"
-   ],
-   "notebook": "log_and_case_attribute_candidates.ipynb",
-   "dependency_links": [
-    {
-     "label": "None",
      "slug": null
     }
    ]
   },
   {
-   "number": "1.3",
+   "number": "1.2",
    "category": "Activity Schema Analysis",
    "tags": [
     "Analysis"
@@ -203,7 +122,7 @@ window.PATTERNS = {
    "dependencies": "None",
    "imperfection_relation": "Can support the detection of imperfection pattern \"Scattered Event\".",
    "slug": "schema_population",
-   "row": 13,
+   "row": 12,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -270,7 +189,7 @@ window.PATTERNS = {
    ]
   },
   {
-   "number": "1.4",
+   "number": "1.3",
    "category": "Activity Schema Analysis",
    "tags": [
     "Modification"
@@ -284,7 +203,7 @@ window.PATTERNS = {
    "dependencies": "Log and Case Attribute Candidates",
    "imperfection_relation": "",
    "slug": "case_table",
-   "row": 14,
+   "row": 13,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -346,12 +265,12 @@ window.PATTERNS = {
    "dependency_links": [
     {
      "label": "Log and Case Attribute Candidates",
-     "slug": "log_and_case_attribute_candidates"
+     "slug": null
     }
    ]
   },
   {
-   "number": "1.5",
+   "number": "1.4",
    "category": "Activity Schema Analysis",
    "tags": [
     "Analysis",
@@ -366,7 +285,7 @@ window.PATTERNS = {
    "dependencies": "None",
    "imperfection_relation": "",
    "slug": "duplicate_events_detection_and_removal",
-   "row": 15,
+   "row": 14,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -447,7 +366,7 @@ window.PATTERNS = {
    "dependencies": "Activity Schema Definition and Overlap",
    "imperfection_relation": "",
    "slug": "univariate_analysis",
-   "row": 16,
+   "row": 15,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -519,7 +438,7 @@ window.PATTERNS = {
    "dependencies": "Activity Schema Definition and Overlap",
    "imperfection_relation": "Can support the detection of imperfection pattern \"Scattered Event\".",
    "slug": "activity_attribute_association",
-   "row": 17,
+   "row": 16,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -585,7 +504,7 @@ window.PATTERNS = {
    "dependencies": "None",
    "imperfection_relation": "",
    "slug": "attribute_functional_relationship",
-   "row": 18,
+   "row": 17,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -666,7 +585,7 @@ window.PATTERNS = {
    "dependencies": "Can be triggered by Log and Case Attribute Candidates, and\nAttribute Functional Relationship",
    "imperfection_relation": "",
    "slug": "redundant_attribute",
-   "row": 19,
+   "row": 18,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -742,7 +661,7 @@ window.PATTERNS = {
    "dependencies": "None",
    "imperfection_relation": "Can support the detection of imperfection pattern \"Polluted Label\".",
    "slug": "attribute_classification",
-   "row": 20,
+   "row": 19,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -823,7 +742,7 @@ window.PATTERNS = {
    "dependencies": "Can be informed by Attribute Classification, or Attribute Functional Relationship",
    "imperfection_relation": "Can support the detection of imperfection pattern \"Scattered Event\".",
    "slug": "consistency_check",
-   "row": 21,
+   "row": 20,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -889,7 +808,7 @@ window.PATTERNS = {
    "dependencies": "None",
    "imperfection_relation": "",
    "slug": "bivariate_analysis",
-   "row": 22,
+   "row": 21,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -950,7 +869,7 @@ window.PATTERNS = {
    "dependencies": "Can be informed by all analysis patterns",
    "imperfection_relation": "",
    "slug": "enrichment",
-   "row": 23,
+   "row": 22,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -1001,7 +920,7 @@ window.PATTERNS = {
    "dependencies": "None",
    "imperfection_relation": "Can support the detection of imperfection pattern \"Homonymous Labels\".",
    "slug": "activity_occurrence_statistics",
-   "row": 24,
+   "row": 23,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -1082,7 +1001,7 @@ window.PATTERNS = {
    "dependencies": "Reuses parts of the implementation of Activity Occurrence Statistics",
    "imperfection_relation": "Can support the detection of imperfection pattern \"Collateral Events\".",
    "slug": "transaction_detection",
-   "row": 25,
+   "row": 24,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -1163,7 +1082,7 @@ window.PATTERNS = {
    "dependencies": "Can be triggered by Transaction Detection, or Super Events and Batching Candidates",
    "imperfection_relation": "Activity Folding can support the remedy to imperfection patterns \"Collateral Events\" and \"Polluted Label\", \"Distorted Label\", \"Synonymous Labels\".<br>Activity Unfolding can support the detection of imperfection pattern \"Scattered Event\".",
    "slug": "activity_folding_and_unfolding",
-   "row": 26,
+   "row": 25,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -1235,7 +1154,7 @@ window.PATTERNS = {
    "dependencies": "None",
    "imperfection_relation": "Can support the detection of and remedy to imperfection pattern \"Unanchored Event\".",
    "slug": "timestamp_granularity",
-   "row": 27,
+   "row": 26,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -1316,7 +1235,7 @@ window.PATTERNS = {
    "dependencies": "Timestamp Granularity",
    "imperfection_relation": "Can support the remedy to imperfection pattern \"Unanchored Event\".",
    "slug": "timezone_conversion",
-   "row": 28,
+   "row": 27,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -1398,7 +1317,7 @@ window.PATTERNS = {
    "dependencies": "Attribute Classification\nTimestamp Granularity",
    "imperfection_relation": "",
    "slug": "event_ordering",
-   "row": 29,
+   "row": 28,
    "evidence_blocks": [
     {
      "dataset": "RTFM",
@@ -1484,7 +1403,7 @@ window.PATTERNS = {
    "dependencies": "Timestamp Granularity\n\nReuses parts of the implementation of Event Ordering (Case-wise) & Timestamp Granularity",
    "imperfection_relation": "Can support the detection of imperfection pattern \"Form-based Event Capture\"",
    "slug": "super_events_and_batching_candidates",
-   "row": 30,
+   "row": 29,
    "evidence_blocks": [
     {
      "dataset": "RTFM",

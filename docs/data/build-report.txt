@@ -1,16 +1,17 @@
 Build report for Patterns_findings.xlsx, saved 2026-09-16
-20 patterns, 20 with a notebook, 20 notebooks rendered
+19 patterns, 19 with a notebook, 19 notebooks rendered
 
 dependency Activity Folding and Unfolding: dependency 'Can be triggered by Transaction Detection' matches no pattern
 dependency Activity Folding and Unfolding: dependency 'or Super Events and Batching Candidates' matches no pattern
 dependency Activity Occurrence Statistics: dependency 'None' matches no pattern
+dependency Activity Schema Definition and Overlap: dependency 'Log and Case Attribute Candidates' matches no pattern
 dependency Attribute Classification: dependency 'None' matches no pattern
 dependency Attribute Functional Relationship: dependency 'None' matches no pattern
 dependency Bivariate Analysis: dependency 'None' matches no pattern
+dependency Case Table: dependency 'Log and Case Attribute Candidates' matches no pattern
 dependency Consistency Check: dependency 'Can be informed by Attribute Classification' matches no pattern
 dependency Consistency Check: dependency 'or Attribute Functional Relationship' matches no pattern
 dependency Duplicate Events Detection and Removal: dependency 'None' matches no pattern
 dependency Enrichment: dependency 'Can be informed by all analysis patterns' matches no pattern
-dependency Log and Case Attribute Candidates: dependency 'None' matches no pattern
 dependency Schema Population: dependency 'None' matches no pattern
 dependency Timestamp Granularity: dependency 'None' matches no pattern
