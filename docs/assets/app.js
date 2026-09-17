@@ -19,7 +19,6 @@ const state = {
   q: '',
   category: new Set(),
   tags: new Set(),
-  dataset: new Set(),
   sort: 'category',
 };
 
@@ -40,7 +39,7 @@ function haystack(p) {
     p.number, p.name, p.category, (p.tags || []).join(' '),
     stripTags(p.information_need), stripTags(p.motivation), stripTags(p.preconditions),
     stripTags(p.approach), stripTags(p.output),
-    (p.evidence_blocks || []).map(b => `${b.dataset || ''} ${stripTags(b.html)}`).join(' '),
+    (p.evidence_blocks || []).map(b => `${b.dataset || ''} ${stripTags(b.html)} ${stripTags(b.utility)}`).join(' '),
     p.dependencies, stripTags(p.imperfection_relation), p.notebook || '',
   ].join(' ').toLowerCase();
   return p._hay;
@@ -55,7 +54,6 @@ function matches(p, skip) {
   }
   if (skip !== 'category' && state.category.size && !state.category.has(p.category)) return false;
   if (skip !== 'tags' && state.tags.size && !p.tags.some(t => state.tags.has(t))) return false;
-  if (skip !== 'dataset' && state.dataset.size && !p.datasets.some(d => state.dataset.has(d))) return false;
   return true;
 }
 
@@ -85,9 +83,7 @@ function filterGroup(title, key, values, decorate) {
   box.appendChild(el('h3', null, title));
   values.forEach(value => {
     const count = PATTERNS.filter(p => matches(p, key) && (
-      key === 'dataset' ? p.datasets.includes(value)
-        : key === 'tags' ? p.tags.includes(value)
-          : p[key] === value
+      key === 'tags' ? p.tags.includes(value) : p[key] === value
     )).length;
     const active = state[key].has(value);
     const label = el('label', 'fopt' + (count === 0 && !active ? ' off' : ''));
@@ -115,7 +111,6 @@ function renderFilters() {
     return dot;
   }));
   if (DATA.tags.length) host.appendChild(filterGroup('Tags', 'tags', DATA.tags));
-  host.appendChild(filterGroup('Evidence from', 'dataset', DATA.datasets));
 }
 
 /* ---------- chips ---------- */
@@ -216,13 +211,23 @@ function field(title, html, opts = {}) {
 function evidenceSection(p) {
   if (!p.evidence_blocks.length) return null;
   const section = el('section', 'field');
-  section.appendChild(el('h3', null, 'Relevant evidence'));
+  section.appendChild(el('h3', null, 'Evidence and Utility'));
   p.evidence_blocks.forEach(block => {
     const box = el('div', 'evidence-block');
     if (block.dataset) box.appendChild(el('div', 'ds', block.dataset));
-    const body = el('div', 'body');
-    body.innerHTML = block.html;
-    box.appendChild(body);
+    if (block.html) {
+      const body = el('div', 'body');
+      body.innerHTML = block.html;
+      box.appendChild(body);
+    }
+    if (block.utility) {
+      const util = el('div', 'utility');
+      util.appendChild(el('div', 'utility-label', 'Utility'));
+      const body = el('div', 'body');
+      body.innerHTML = block.utility;
+      util.appendChild(body);
+      box.appendChild(util);
+    }
     section.appendChild(box);
   });
   return section;
@@ -392,7 +397,7 @@ function init() {
   document.getElementById('reset').addEventListener('click', () => {
     state.q = '';
     search.value = '';
-    ['category', 'tags', 'dataset'].forEach(k => state[k].clear());
+    ['category', 'tags'].forEach(k => state[k].clear());
     render();
   });
 
