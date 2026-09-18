@@ -47,15 +47,22 @@ automatically whenever a new workbook is pushed.
 |---|---|
 | Sheet `Pattern Definitions & Examples `, header row 9, rows 11 onwards | one pattern each |
 | *Tags* (one per line and/or comma-separated) | filterable tag chips |
-| `RTFM:`, `Sepsis:`, … in *Relevant Evidence* | evidence split per dataset, filterable |
+| Sheets `EventLog Analysis Results` + `Utility`, joined by *No.* | the **Evidence and Utility** section, one block per event log |
 | *Dependencies* naming other patterns | clickable links between patterns |
 | *Relation with Imperfection Patterns* | shown as a plain-text section |
 
-The columns read are *No., Category, Tags, Name, Information Need / Modification
-Objective, Motivation / Context, Preconditions, Approach, Output, Relevant
-Evidence, Dependencies* and *Relation with Imperfection Patterns*. The
-*Literature Support*, *Notes* and *Further notes* columns, and the workbook's
-threaded comments, are deliberately **not** carried onto the site.
+The catalogue columns read from `Pattern Definitions & Examples ` are *No.,
+Category, Tags, Name, Information Need / Modification Objective, Motivation /
+Context, Preconditions, Approach, Output, Dependencies* and *Relation with
+Imperfection Patterns*. The *Relevant Evidence*, *Literature Support*, *Notes*
+and *Further notes* columns on that sheet are **not** used.
+
+Evidence comes from the `EventLog Analysis Results` sheet and the analyst
+takeaway from the `Utility` sheet — both have a *No. / Category / Pattern name*
+block followed by one column per event log, and are joined to the catalogue by
+*No.*. A pattern × event-log block is shown **only where the Utility cell has
+content**; the evidence is then displayed with its utility appended. If a
+utility cell is empty, that event log's evidence is not shown at all.
 
 Cell fill colours and bold text in the workbook are **not** interpreted: the
 site has no status or "in marimo" markers and no per-field discussion flags.

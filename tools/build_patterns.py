@@ -33,8 +33,11 @@ from openpyxl.cell.rich_text import CellRichText
 REPO = Path(__file__).resolve().parent.parent
 WORKBOOK = REPO / "Patterns_findings.xlsx"
 SHEET = "Pattern Definitions & Examples "
-# Per-event-log evidence lives on its own sheet, joined to the catalogue by No.
+# Per-event-log evidence and its analyst utility live on their own sheets, both
+# joined to the catalogue by No. A pattern x log block is shown only when the
+# Utility sheet has content for it; the evidence is then appended with its utility.
 EVIDENCE_SHEET = "EventLog Analysis Results"
+UTILITY_SHEET = "Utility"
 OUT_JS = REPO / "docs" / "data" / "patterns.js"
 OUT_NOTEBOOKS = REPO / "docs" / "data" / "notebooks.js"
 OUT_REPORT = REPO / "docs" / "data" / "build-report.txt"
@@ -164,19 +167,22 @@ def _pretty_dataset(header: str) -> str:
     return re.sub(r"^(BPIC)\s*(?=\d)", r"\1 ", label)
 
 
-def load_evidence(wb) -> tuple[dict[str, list[dict]], dict[str, str]]:
-    """Read per-event-log evidence from the EVIDENCE_SHEET, keyed by pattern No.
+def read_log_matrix(wb, sheet_name: str) -> tuple[dict[str, dict[str, str]], dict[str, str], list[str]]:
+    """Read a per-pattern x per-event-log sheet, keyed by pattern No.
 
-    Returns (evidence_by_number, name_by_number). Each evidence value is a list
-    of {dataset, html} blocks, one per event-log column that holds real content;
-    empty, "N/A" and "Nothing relevant identified" cells are dropped. Columns are
-    located by header (so the sheet can be reordered) and the join to the
-    catalogue is on the pattern number.
+    Both "EventLog Analysis Results" (evidence) and "Utility" share this layout:
+    a No./Category/Pattern name block followed by one column per event log.
+    Returns (by_number, name_by_number, log_order) where by_number[number] maps an
+    event-log label to that cell's HTML for every column that holds real content
+    (empty, "N/A" and "Nothing relevant identified" cells are dropped), and
+    log_order is the event-log labels in column order. Columns are located by
+    header, so the sheet can be reordered, and the join to the catalogue is on the
+    pattern number.
     """
-    if EVIDENCE_SHEET not in wb.sheetnames:
-        note("evidence", f"sheet {EVIDENCE_SHEET!r} not found; no per-log evidence loaded")
-        return {}, {}
-    ws = wb[EVIDENCE_SHEET]
+    if sheet_name not in wb.sheetnames:
+        note("evidence", f"sheet {sheet_name!r} not found; nothing loaded from it")
+        return {}, {}, []
+    ws = wb[sheet_name]
 
     num_col = name_col = None
     log_cols: list[tuple[int, str]] = []
@@ -190,30 +196,29 @@ def load_evidence(wb) -> tuple[dict[str, list[dict]], dict[str, str]]:
         elif key and key not in EVIDENCE_META_HEADERS:
             log_cols.append((col, _pretty_dataset(header)))
     if num_col is None:
-        note("evidence", f"{EVIDENCE_SHEET}: no 'No.' column found; cannot join evidence")
-        return {}, {}
+        note("evidence", f"{sheet_name}: no 'No.' column found; nothing loaded from it")
+        return {}, {}, []
 
-    evidence: dict[str, list[dict]] = {}
+    by_number: dict[str, dict[str, str]] = {}
     names: dict[str, str] = {}
     for row in range(2, ws.max_row + 1):
         number = plain(ws.cell(row, num_col).value)
         # Skip section-header rows: a No. (e.g. "1") with a category but no
-        # pattern name. Real evidence rows always name a pattern.
+        # pattern name. Real rows always name a pattern.
         row_name = plain(ws.cell(row, name_col).value) if name_col is not None else ""
         if not number or (name_col is not None and not row_name):
             continue
-        if number in evidence:
-            note("evidence", f"{EVIDENCE_SHEET}: pattern number {number} appears in more than one row")
-        blocks = []
+        if number in by_number:
+            note("evidence", f"{sheet_name}: pattern number {number} appears in more than one row")
+        cells = {}
         for col, label in log_cols:
-            html = rich_to_html(ws.cell(row, col).value)
-            if _is_blank_evidence(html):
-                continue
-            blocks.append({"dataset": label, "html": _tidy(html)})
-        evidence[number] = blocks
+            html = _tidy(rich_to_html(ws.cell(row, col).value))
+            if not _is_blank_evidence(html):
+                cells[label] = html
+        by_number[number] = cells
         if row_name:
             names[number] = row_name
-    return evidence, names
+    return by_number, names, [label for _, label in log_cols]
 
 
 def split_tags(raw: str) -> list[str]:
@@ -302,7 +307,11 @@ def build(workbook_path: Path) -> dict:
         raise SystemExit(f"sheet {SHEET!r} not found; sheets are {wb.sheetnames}")
     ws = wb[SHEET]
     columns = resolve_columns(ws)
-    evidence_by_number, evidence_names = load_evidence(wb)
+    evidence_by_number, evidence_names, evidence_logs = read_log_matrix(wb, EVIDENCE_SHEET)
+    utility_by_number, utility_names, utility_logs = read_log_matrix(wb, UTILITY_SHEET)
+    # Present the event logs in the evidence sheet's column order, with any that
+    # only appear on the Utility sheet appended after them.
+    log_order = evidence_logs + [log for log in utility_logs if log not in evidence_logs]
 
     notebooks = {slugify(p.stem): p.name for p in sorted(REPO.glob("*.ipynb"))}
     used_notebooks: set[str] = set()
@@ -331,8 +340,16 @@ def build(workbook_path: Path) -> dict:
         record["slug"] = slug
         record["row"] = row
         record["tags"] = split_tags(record["tags"])
-        # Evidence comes from EVIDENCE_SHEET, joined on the pattern number.
-        record["evidence_blocks"] = evidence_by_number.get(record["number"], [])
+        # One block per event log, shown only where the Utility sheet has content;
+        # each block carries the evidence with its utility appended. A log whose
+        # utility cell is empty is omitted entirely, even if evidence exists.
+        ev_cells = evidence_by_number.get(record["number"], {})
+        ut_cells = utility_by_number.get(record["number"], {})
+        record["evidence_blocks"] = [
+            {"dataset": log, "html": ev_cells.get(log, ""), "utility": ut_cells[log]}
+            for log in log_order
+            if log in ut_cells
+        ]
         record["datasets"] = sorted(
             {b["dataset"] for b in record["evidence_blocks"] if b["dataset"]}
         )
@@ -367,20 +384,27 @@ def build(workbook_path: Path) -> dict:
     for name in sorted(set(notebooks.values()) - used_notebooks):
         note("notebook", f"{name} is in the repo but matches no pattern name")
 
-    # Cross-check the evidence sheet against the catalogue (join is on the number).
+    # Cross-check the evidence and utility sheets against the catalogue (join is
+    # on the number). A pattern with no utility shows no Evidence & Utility section.
     pattern_numbers = {p["number"] for p in patterns}
     for p in patterns:
         if p["number"] not in evidence_by_number:
             note("evidence", f"{p['name']} (No. {p['number']}): no row in {EVIDENCE_SHEET}")
-        elif not p["evidence_blocks"]:
-            note("evidence", f"{p['name']} (No. {p['number']}): evidence row has no usable content")
-        other = evidence_names.get(p["number"], "")
+        if not p["evidence_blocks"]:
+            note("utility", f"{p['name']} (No. {p['number']}): no utility filled in, so no evidence is shown")
+        # Utility written for a log that has no evidence to append it to.
+        ev_cells = evidence_by_number.get(p["number"], {})
+        for block in p["evidence_blocks"]:
+            if not block["html"]:
+                note("utility", f"{p['name']} (No. {p['number']}, {block['dataset']}): "
+                                f"utility present but no evidence in {EVIDENCE_SHEET}")
+        other = evidence_names.get(p["number"]) or utility_names.get(p["number"]) or ""
         if other and slugify(other) != slugify(p["name"]):
             note("evidence", f"No. {p['number']}: name differs between sheets "
-                             f"({p['name']!r} vs {other!r} on {EVIDENCE_SHEET})")
-    for number in sorted(set(evidence_by_number) - pattern_numbers):
-        label = evidence_names.get(number, "")
-        note("evidence", f"{EVIDENCE_SHEET} row No. {number} ({label!r}) matches no pattern")
+                             f"({p['name']!r} vs {other!r})")
+    for number in sorted((set(evidence_by_number) | set(utility_by_number)) - pattern_numbers):
+        label = evidence_names.get(number) or utility_names.get(number) or ""
+        note("evidence", f"row No. {number} ({label!r}) matches no pattern")
 
     # Order categories by the lowest pattern number they contain, so the
     # catalogue reads 1.x, 2.x, 3.x … rather than alphabetically. Categories
