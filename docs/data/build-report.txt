@@ -1,4 +1,4 @@
-Build report for Patterns_findings.xlsx, saved 2026-09-17
+Build report for Patterns_findings.xlsx, saved 2026-09-18
 18 patterns, 18 with a notebook, 18 notebooks rendered
 
 dependency Activity Folding and Unfolding: dependency 'Can be triggered by Transaction Detection' matches no pattern
@@ -15,5 +15,4 @@ dependency Duplicate Events Detection and Removal: dependency 'None' matches no 
 dependency Enrichment: dependency 'Can be informed by all analysis patterns' matches no pattern
 dependency Schema Population: dependency 'None' matches no pattern
 dependency Timestamp Granularity: dependency 'None' matches no pattern
-notebook  log_and_case_attribute_candidates.ipynb is in the repo but matches no pattern name
-utility   Consistency Check (No. 2.6, BPIC 2020): utility present but no evidence in EventLog Analysis Results
+skip      row 2: no name, skipped
