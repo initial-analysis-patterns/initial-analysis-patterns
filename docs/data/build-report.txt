@@ -1,50 +1,18 @@
 Build report for Patterns_findings.xlsx, saved 2026-09-18
-0 patterns, 0 with a notebook, 0 notebooks rendered
+18 patterns, 18 with a notebook, 18 notebooks rendered
 
-column    header 'Approach' not found in row 9; approach left blank
-column    header 'Category' not found in row 9; category left blank
-column    header 'Dependencies' not found in row 9; dependencies left blank
-column    header 'Information Need / Modification Objective' not found in row 9; information_need left blank
-column    header 'Motivation / Context' not found in row 9; motivation left blank
-column    header 'Name' not found in row 9; name left blank
-column    header 'No.' not found in row 9; number left blank
-column    header 'Output' not found in row 9; output left blank
-column    header 'Preconditions' not found in row 9; preconditions left blank
-column    header 'Relation with Imperfection Patterns' not found in row 9; imperfection_relation left blank
-column    header 'Tags' not found in row 9; tags left blank
-evidence  row No. 1.1 ('Activity Schema Definition and Overlap') matches no pattern
-evidence  row No. 1.2 ('Schema Population') matches no pattern
-evidence  row No. 1.3 ('Case Table') matches no pattern
-evidence  row No. 1.4 ('Duplicate Events Detection and Removal') matches no pattern
-evidence  row No. 2.1 ('Univariate Analysis') matches no pattern
-evidence  row No. 2.2 ('Activity–Attribute Association') matches no pattern
-evidence  row No. 2.3 ('Attribute Functional Relationship') matches no pattern
-evidence  row No. 2.4 ('Redundant Attribute') matches no pattern
-evidence  row No. 2.5 ('Attribute Classification') matches no pattern
-evidence  row No. 2.6 ('Consistency Check') matches no pattern
-evidence  row No. 2.7 ('Bivariate Analysis') matches no pattern
-evidence  row No. 2.8 ('Enrichment') matches no pattern
-evidence  row No. 3.1 ('Activity Occurrence Statistics') matches no pattern
-evidence  row No. 3.2 ('Transaction Detection') matches no pattern
-evidence  row No. 3.3 ('Activity Folding and Unfolding') matches no pattern
-evidence  row No. 4.1 ('Timestamp Granularity') matches no pattern
-evidence  row No. 4.2 ('Event Ordering') matches no pattern
-evidence  row No. 4.3 ('Super Events and Batching Candidates') matches no pattern
-notebook  activity-attribute_association.ipynb is in the repo but matches no pattern name
-notebook  activity_folding_and_unfolding.ipynb is in the repo but matches no pattern name
-notebook  activity_occurrence_statistics.ipynb is in the repo but matches no pattern name
-notebook  activity_schema_definition_and_overlap.ipynb is in the repo but matches no pattern name
-notebook  attribute_classification.ipynb is in the repo but matches no pattern name
-notebook  attribute_functional_relationship.ipynb is in the repo but matches no pattern name
-notebook  bivariate_analysis.ipynb is in the repo but matches no pattern name
-notebook  case_table.ipynb is in the repo but matches no pattern name
-notebook  consistency_check.ipynb is in the repo but matches no pattern name
-notebook  duplicate_events_detection_and_removal.ipynb is in the repo but matches no pattern name
-notebook  enrichment.ipynb is in the repo but matches no pattern name
-notebook  event_ordering.ipynb is in the repo but matches no pattern name
-notebook  redundant_attribute.ipynb is in the repo but matches no pattern name
-notebook  schema_population.ipynb is in the repo but matches no pattern name
-notebook  super_events_and_batching_candidates.ipynb is in the repo but matches no pattern name
-notebook  timestamp_granularity.ipynb is in the repo but matches no pattern name
-notebook  transaction_detection.ipynb is in the repo but matches no pattern name
-notebook  univariate_analysis.ipynb is in the repo but matches no pattern name
+dependency Activity Folding and Unfolding: dependency 'Can be triggered by Transaction Detection' matches no pattern
+dependency Activity Folding and Unfolding: dependency 'or Super Events and Batching Candidates' matches no pattern
+dependency Activity Occurrence Statistics: dependency 'None' matches no pattern
+dependency Activity Schema Definition and Overlap: dependency 'Log and Case Attribute Candidates' matches no pattern
+dependency Attribute Classification: dependency 'None' matches no pattern
+dependency Attribute Functional Relationship: dependency 'None' matches no pattern
+dependency Bivariate Analysis: dependency 'None' matches no pattern
+dependency Case Table: dependency 'Log and Case Attribute Candidates' matches no pattern
+dependency Consistency Check: dependency 'Can be informed by Attribute Classification' matches no pattern
+dependency Consistency Check: dependency 'or Attribute Functional Relationship' matches no pattern
+dependency Duplicate Events Detection and Removal: dependency 'None' matches no pattern
+dependency Enrichment: dependency 'Can be informed by all analysis patterns' matches no pattern
+dependency Schema Population: dependency 'None' matches no pattern
+dependency Timestamp Granularity: dependency 'None' matches no pattern
+skip      row 2: no name, skipped

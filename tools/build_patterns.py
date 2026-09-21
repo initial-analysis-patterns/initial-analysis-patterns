@@ -42,13 +42,12 @@ OUT_JS = REPO / "docs" / "data" / "patterns.js"
 OUT_NOTEBOOKS = REPO / "docs" / "data" / "notebooks.js"
 OUT_REPORT = REPO / "docs" / "data" / "build-report.txt"
 
-HEADER_ROW = 9
-FIRST_DATA_ROW = 11
-
-# Website field key -> exact header text in the workbook's header row (row 9).
-# Columns are matched by header, not by position, so they can be reordered in
-# Excel without touching this file. Matching is case-insensitive and ignores
-# differences in surrounding/internal whitespace. Any column whose header is not
+# Website field key -> exact header text in the workbook's header row. The header
+# row is located automatically (see find_header_row), and columns are matched by
+# header, not by position, so both rows above the table and the column order can
+# change in Excel without touching this file. Matching is case-insensitive and
+# ignores differences in surrounding/internal whitespace. Any column whose header
+# is not
 # listed here (Relevant Evidence, Literature Support, Notes, …) is deliberately
 # not carried onto the site: the evidence comes from EVIDENCE_SHEET instead.
 FIELD_HEADERS = {
@@ -278,7 +277,28 @@ def _norm_header(value) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip().lower()
 
 
-def resolve_columns(ws) -> dict[int, str]:
+def find_header_row(ws, max_scan: int = 25) -> int:
+    """Locate the header row by matching FIELD_HEADERS against each of the first
+    rows, returning the 1-based index of the row with the most header matches.
+
+    This keeps the build working when rows are added or removed above the table.
+    Falls back to row 1 (and reports it) if no row matches any header.
+    """
+    wanted = {_norm_header(h) for h in FIELD_HEADERS.values()}
+    best_row, best_hits = 1, 0
+    for row in range(1, min(ws.max_row, max_scan) + 1):
+        hits = sum(
+            1 for col in range(1, ws.max_column + 1)
+            if _norm_header(ws.cell(row, col).value) in wanted
+        )
+        if hits > best_hits:
+            best_row, best_hits = row, hits
+    if best_hits == 0:
+        note("column", f"no header row found in the first {max_scan} rows of {SHEET!r}")
+    return best_row
+
+
+def resolve_columns(ws, header_row: int) -> dict[int, str]:
     """Map each website field to its workbook column by matching the header row.
 
     Returns {column index: field key}. A header listed in FIELD_HEADERS but not
@@ -287,7 +307,7 @@ def resolve_columns(ws) -> dict[int, str]:
     """
     header_to_col: dict[str, int] = {}
     for col in range(1, ws.max_column + 1):
-        header = _norm_header(ws.cell(HEADER_ROW, col).value)
+        header = _norm_header(ws.cell(header_row, col).value)
         if header:
             header_to_col.setdefault(header, col)
 
@@ -295,7 +315,7 @@ def resolve_columns(ws) -> dict[int, str]:
     for key, header in FIELD_HEADERS.items():
         col = header_to_col.get(_norm_header(header))
         if col is None:
-            note("column", f"header {header!r} not found in row {HEADER_ROW}; {key} left blank")
+            note("column", f"header {header!r} not found in row {header_row}; {key} left blank")
             continue
         columns[col] = key
     return columns
@@ -306,7 +326,8 @@ def build(workbook_path: Path) -> dict:
     if SHEET not in wb.sheetnames:
         raise SystemExit(f"sheet {SHEET!r} not found; sheets are {wb.sheetnames}")
     ws = wb[SHEET]
-    columns = resolve_columns(ws)
+    header_row = find_header_row(ws)
+    columns = resolve_columns(ws, header_row)
     evidence_by_number, evidence_names, evidence_logs = read_log_matrix(wb, EVIDENCE_SHEET)
     utility_by_number, utility_names, utility_logs = read_log_matrix(wb, UTILITY_SHEET)
     # Present the event logs in the evidence sheet's column order, with any that
@@ -317,7 +338,9 @@ def build(workbook_path: Path) -> dict:
     used_notebooks: set[str] = set()
 
     patterns = []
-    for row in range(FIRST_DATA_ROW, ws.max_row + 1):
+    # Data rows follow the header; a sub-header row (if any) and blank rows are
+    # skipped below because their Name cell is empty.
+    for row in range(header_row + 1, ws.max_row + 1):
         if all(ws.cell(row, col).value in (None, "") for col in columns):
             continue
 
